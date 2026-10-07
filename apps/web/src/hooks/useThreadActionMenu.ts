@@ -21,6 +21,7 @@ import {
   threadActionRequiresOperate,
   type ThreadActionMenuId,
 } from "../components/threadActionMenu.logic";
+import { readThreadHandoffTargets, startThreadHandoff } from "../components/threadHandoffMenu";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
 import { threadEnvironment } from "../state/threads";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
@@ -147,6 +148,10 @@ export function useThreadActionMenu(input: {
         };
         const isRegeneratingTitle = thread.titleRegeneration != null;
         const snoozePresets = resolveSnoozePresets(now, timestampFormat);
+        const handoffTargets =
+          thread.handoff == null || thread.handoff.state === "failed"
+            ? await readThreadHandoffTargets(threadRef.environmentId, threadRef.threadId)
+            : [];
         const items = buildThreadActionMenuItems({
           canOperate: readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope),
           branch: thread.branch ?? null,
@@ -160,6 +165,7 @@ export function useThreadActionMenu(input: {
           isRunning: !threadRuntimeCanArchive(thread.runtime),
           supports,
           snoozePresets,
+          handoffTargets,
         });
         const clicked = await settlePromise(() => api.contextMenu.show(items, position));
         if (clicked._tag === "Failure" || clicked.value === null) return;
@@ -171,6 +177,14 @@ export function useThreadActionMenu(input: {
           failureToast(
             "Thread action unavailable",
             new Error("This connection cannot change threads."),
+          );
+          return;
+        }
+        if (action.startsWith("continue-on:")) {
+          await startThreadHandoff(
+            threadRef.environmentId,
+            threadRef.threadId,
+            action.slice("continue-on:".length),
           );
           return;
         }

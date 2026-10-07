@@ -178,6 +178,7 @@ import {
   buildThreadActionMenuItems,
   threadActionRequiresOperate,
 } from "./threadActionMenu.logic";
+import { readThreadHandoffTargets, startThreadHandoff } from "./threadHandoffMenu";
 import {
   animateSidebarLayoutChanges,
   applySidebarThreadDrop,
@@ -4582,6 +4583,10 @@ export default function Sidebar() {
                 projectRef.projectId === thread.projectId,
             ),
           ) ?? null;
+        const handoffTargets =
+          thread.handoff == null || thread.handoff.state === "failed"
+            ? await readThreadHandoffTargets(thread.environmentId, thread.id)
+            : [];
         const clicked = await settlePromise(() =>
           api.contextMenu.show(
             buildThreadActionMenuItems({
@@ -4611,12 +4616,21 @@ export default function Sidebar() {
                 titleRegeneration: supportsTitleRegeneration,
               },
               snoozePresets,
+              handoffTargets,
             }),
             position,
           ),
         );
         if (clicked._tag === "Failure" || clicked.value === null) return;
         if (threadActionRequiresOperate(clicked.value) && !checkThreadOperations([thread])) return;
+        if (clicked.value?.startsWith("continue-on:")) {
+          await startThreadHandoff(
+            thread.environmentId,
+            thread.id,
+            clicked.value.slice("continue-on:".length),
+          );
+          return;
+        }
         if (clicked.value?.startsWith("snooze:")) {
           const preset =
             clicked.value === "snooze:custom"

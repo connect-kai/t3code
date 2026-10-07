@@ -284,6 +284,10 @@ import { PullRequestDetailPanel } from "./pullRequest/PullRequestDetailPanel";
 import { PullRequestDetailGhost } from "./pullRequest/PullRequestGhosts";
 import { PullRequestsUnavailableState } from "./pullRequest/PullRequestsUnavailableState";
 import { RightPanelTabs } from "./RightPanelTabs";
+import {
+  threadHandoffSendBlockReason,
+  useThreadHandoffBannerItem,
+} from "./chat/ThreadHandoffBanner";
 import { LinkPullRequestDialogHost } from "./pullRequest/LinkPullRequestDialog";
 import { ThreadPullRequestsPanel } from "./pullRequest/ThreadPullRequestsPanel";
 import { useDeviceState } from "~/state/device";
@@ -7619,6 +7623,7 @@ export default function ChatView(props: ChatViewProps) {
     isUnsnoozing,
     nowMinute,
   ]);
+  const threadHandoffBannerItem = useThreadHandoffBannerItem(activeThreadShell);
   const activeThreadHasCompactableConversation = serverVisibleTurnItems.some(
     ({ item }) =>
       item.type === "user_message" &&
@@ -7731,11 +7736,13 @@ export default function ChatView(props: ChatViewProps) {
     const backgroundWorkItems = [goalBannerItem, backgroundWorkBannerItem].filter(
       (item) => item !== null,
     );
+    const handoffItems = threadHandoffBannerItem === null ? [] : [threadHandoffBannerItem];
     // The user asked for this one, so it leads the notice tier instead of trailing it.
     const usageLimitsItems = usageLimitsBanner === null ? [] : [usageLimitsBanner];
     const projectCloneItems = projectCloneBannerItem === null ? [] : [projectCloneBannerItem];
     if (!localCheckoutBranchMismatch || !showBranchMismatchBanner || !activeBranchMismatchKey) {
       return [
+        ...handoffItems,
         ...feedbackBannerItems,
         ...limitRecoveryItems,
         ...usageLimitsItems,
@@ -7745,6 +7752,7 @@ export default function ChatView(props: ChatViewProps) {
       ];
     }
     return [
+      ...handoffItems,
       ...feedbackBannerItems,
       ...limitRecoveryItems,
       ...usageLimitsItems,
@@ -7802,6 +7810,7 @@ export default function ChatView(props: ChatViewProps) {
     backgroundWorkBannerItem,
     goalBannerItem,
     localCheckoutBranchMismatch,
+    threadHandoffBannerItem,
     projectCloneBannerItem,
     showBranchMismatchBanner,
     systemComposerBannerItems,
@@ -11505,7 +11514,8 @@ export default function ChatView(props: ChatViewProps) {
                               sendDisabledReason={
                                 !canOperateThread
                                   ? "This connection cannot change threads."
-                                  : isEnvironmentChanging
+                                  : (threadHandoffSendBlockReason(activeThreadShell) ??
+                                    (isEnvironmentChanging
                                     ? "Preparing machine"
                                     : isRevertingCheckpoint
                                       ? "Rewinding conversation"
@@ -11515,7 +11525,7 @@ export default function ChatView(props: ChatViewProps) {
                                           ? "Messages loading"
                                           : worktreeSetupBlocksSend
                                             ? "Preparing worktree"
-                                            : projectCloneSendBlockReason
+                                            : projectCloneSendBlockReason))
                               }
                               isPreparingWorktree={isPreparingWorktree}
                               queuedRunsControl={
