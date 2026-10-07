@@ -23,6 +23,7 @@ import * as ProjectService from "../project/ProjectService.ts";
 import * as ProjectSetupScriptRunner from "../project/ProjectSetupScriptRunner.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as VcsStatusBroadcaster from "../vcs/VcsStatusBroadcaster.ts";
+import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import type { McpInvocationScope, McpThreadInvocationScope } from "./McpInvocationContext.ts";
 
 export class WorktreeMcpService extends Context.Service<
@@ -229,6 +230,14 @@ const make = Effect.gen(function* () {
     }
 
     const startFromOrigin = input.startFromOrigin ?? (yield* readDefaultStartFromOrigin);
+    const configuredWorktreePathTemplate = yield* serverSettings.getSettings.pipe(
+      Effect.map(
+        (settings) =>
+          resolveProjectSettings(settings, projection.thread.projectId).settings
+            .worktreePathTemplate,
+      ),
+      asOperationFailed("Unable to read worktree path settings"),
+    );
 
     let worktreeBaseRef = baseRef;
     if (startFromOrigin) {
@@ -265,6 +274,9 @@ const make = Effect.gen(function* () {
               newRefName: input.branch,
               baseRefName: baseRef,
               path: input.path ?? null,
+              ...(input.path === undefined && configuredWorktreePathTemplate !== null
+                ? { worktreePathTemplate: configuredWorktreePathTemplate }
+                : {}),
             })
             .pipe(asOperationFailed("Unable to create the worktree")),
         );

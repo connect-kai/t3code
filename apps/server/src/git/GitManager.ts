@@ -2613,11 +2613,15 @@ export const make = Effect.gen(function* () {
         });
       }
 
+      const projectSettings = yield* projectSettingsFor(input).pipe(
+        Effect.orElseSucceed(() => null),
+      );
       const worktree = yield* gitCore.createWorktree(
         {
           cwd: input.cwd,
           refName: localPullRequestBranch,
           path: null,
+          worktreePathTemplate: projectSettings?.worktreePathTemplate,
         },
         {
           worktreesDirectory: yield* readWorktreesDirectory,

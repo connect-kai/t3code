@@ -345,6 +345,7 @@ export default function DiffPanel({
           environmentId: activeThread.environmentId,
           input: {
             cwd: activeCwd,
+            ...(activeProjectId ? { projectId: activeProjectId } : {}),
             ...(selectedBaseRef ? { baseRef: selectedBaseRef } : {}),
             ignoreWhitespace: diffIgnoreWhitespace,
           },
@@ -362,6 +363,7 @@ export default function DiffPanel({
           environmentId: activeThread.environmentId,
           input: {
             cwd: serverConfig.cwd,
+            ...(activeProjectId ? { projectId: activeProjectId } : {}),
             ...(selectedBaseRef ? { baseRef: selectedBaseRef } : {}),
             ignoreWhitespace: diffIgnoreWhitespace,
           },
@@ -393,6 +395,7 @@ export default function DiffPanel({
     return createGitDiffFileContentsLoader(getDiffFileContents, {
       environmentId: activeThread.environmentId,
       cwd: preview.cwd,
+      projectId: activeProjectId ?? undefined,
       sourceKind: selectedGitSource.kind,
       baseRef: selectedGitSource.baseRef,
       headRef: selectedGitSource.headRef,

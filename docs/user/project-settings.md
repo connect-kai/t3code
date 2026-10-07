@@ -52,6 +52,15 @@ to override its environment defaults. Worktree directories keep their original n
 If generation fails, or a custom name is invalid or already taken, the temporary
 branch name remains.
 
+## Worktree path template
+
+In **Settings → General → Worktree path template**, choose the layout for new worktree
+directories. Templates support `{worktreesDir}`, `{repoRoot}`, `{repoName}`, and `{branch}`;
+relative templates resolve from the repository root, while absolute templates are allowed.
+For example, `{repoRoot}/.worktrees/{branch}` keeps checkouts beside the repository, while
+`{worktreesDir}/{repoName}/{branch}` keeps T3's default centralized layout. T3 stores the
+resolved path with the thread so revival and cleanup continue to use the same checkout.
+
 ## Scheduled tasks on mobile
 
 Open **Settings → Scheduled tasks** to create recurring tasks or manage existing

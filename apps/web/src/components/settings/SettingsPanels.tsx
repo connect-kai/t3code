@@ -55,7 +55,6 @@ import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
 import { APP_VERSION, HOSTED_APP_CHANNEL, HOSTED_APP_CHANNEL_LABEL } from "../../branding";
 import { IS_NIGHTLY_BUILD, NightlyMobileBetaRow } from "../NightlyMobileBeta";
-import { CliCommandSettingsRow } from "./CliCommandSettingsRow";
 import {
   canCheckForUpdate,
   getDesktopUpdateButtonTooltip,
@@ -510,7 +509,6 @@ function AboutVersionSection() {
         />
       ) : null}
       {showNightlyMobileBeta ? <NightlyMobileBetaRow /> : null}
-      {hasDesktopBridge ? <CliCommandSettingsRow /> : null}
     </>
   );
 }
@@ -2247,6 +2245,7 @@ export function GeneralSettingsPanel() {
   const backgroundActivityProfileOption = resolveBackgroundActivityProfileOption(settings);
   const mixedBackgroundActivity = useScopedSettingsMixed(["backgroundActivity"]);
   const mixedAddProjectBaseDirectory = useScopedSettingsMixed(["addProjectBaseDirectory"]);
+  const mixedWorktreePathTemplate = useScopedSettingsMixed(["worktreePathTemplate"]);
   const mixedTextGenerationModel = useScopedSettingsMixed(["textGenerationModelSelection"]);
   const backgroundActivityDescription =
     backgroundActivityProfileOption === "advanced"
@@ -3100,6 +3099,37 @@ export function GeneralSettingsPanel() {
               placeholder={mixedAddProjectBaseDirectory ? "Mixed" : "~/"}
               spellCheck={false}
               aria-label="Add project base directory"
+            />
+          }
+        />
+        <SettingsRow
+          serverScoped
+          settingKeys={["worktreePathTemplate"]}
+          {...searchableSetting("worktree-path-template")}
+          description="Controls where new worktrees are created. Use {worktreesDir}, {repoRoot}, {repoName}, and {branch}; relative paths resolve from the repository root."
+          resetAction={
+            settings.worktreePathTemplate !== DEFAULT_UNIFIED_SETTINGS.worktreePathTemplate ? (
+              <SettingResetButton
+                label="worktree path template"
+                onClick={() =>
+                  updateSettings({
+                    worktreePathTemplate: DEFAULT_UNIFIED_SETTINGS.worktreePathTemplate,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <DraftInput
+              size="sm"
+              className="w-full sm:w-96"
+              value={mixedWorktreePathTemplate ? "" : (settings.worktreePathTemplate ?? "")}
+              onCommit={(next) => updateSettings({ worktreePathTemplate: next || null })}
+              placeholder={
+                mixedWorktreePathTemplate ? "Mixed" : "{worktreesDir}/{repoName}/{branch}"
+              }
+              spellCheck={false}
+              aria-label="Worktree path template"
             />
           }
         />

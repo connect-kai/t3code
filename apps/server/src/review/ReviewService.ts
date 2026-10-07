@@ -19,6 +19,7 @@ import * as ServerConfig from "../config.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import { isFilesystemRoot, managedWorktreesDirectories } from "../worktreesDirectory.ts";
 
 export class ReviewService extends Context.Service<
@@ -41,6 +42,7 @@ export const make = Effect.gen(function* () {
   const vcsRegistry = yield* VcsDriverRegistry.VcsDriverRegistry;
   const git = yield* GitVcsDriver.GitVcsDriver;
   const settings = yield* ServerSettings.ServerSettingsService;
+  const projections = yield* ProjectionStore.ProjectionStoreV2;
 
   const canonicalizePath = (value: string) => {
     const resolvedPath = path.resolve(value);
@@ -69,6 +71,7 @@ export const make = Effect.gen(function* () {
   const assertWorkspaceBoundCwd = Effect.fn("ReviewService.assertWorkspaceBoundCwd")(function* (
     operation: "ReviewService.getDiffPreview" | "ReviewService.getDiffFileContents",
     cwd: string,
+    inputProjectId?: string,
   ) {
     const worktreesDirectories = yield* settings.getSettings.pipe(
       Effect.orElseSucceed(() => ({ worktreesDirectory: "", previousWorktreesDirectories: [] })),
@@ -87,11 +90,35 @@ export const make = Effect.gen(function* () {
         ),
       ),
     ]);
-
     if (
       isWithinRoot(candidate, workspaceRoot) ||
       worktreesRoots.some((root) => isWithinRoot(candidate, root))
     ) {
+      return;
+    }
+    const [active, archived] = yield* Effect.all([
+      projections.getShellSnapshot(),
+      projections.getShellSnapshot({ location: "archive" }),
+    ]).pipe(
+      Effect.mapError(
+        (cause) =>
+          new VcsRepositoryDetectionError({
+            operation: "ReviewService.assertWorkspaceBoundCwd.snapshot",
+            cwd,
+            detail:
+              "Failed to read recorded worktree bindings while validating the review workspace.",
+            cause,
+          }),
+      ),
+    );
+    const knownWorktreePaths = yield* Effect.forEach(
+      [...active.threads, ...archived.archivedThreads]
+        .filter((thread) => inputProjectId !== undefined && thread.projectId === inputProjectId)
+        .flatMap((thread) => (thread.worktreePath === null ? [] : [thread.worktreePath])),
+      (worktreePath) => canonicalizePath(worktreePath).pipe(Effect.orElseSucceed(() => null)),
+    ).pipe(Effect.map((paths) => paths.filter((value): value is string => value !== null)));
+
+    if (knownWorktreePaths.some((root) => candidate === root || isWithinRoot(candidate, root))) {
       return;
     }
 
@@ -108,7 +135,7 @@ export const make = Effect.gen(function* () {
   const getDiffPreview: ReviewService["Service"]["getDiffPreview"] = Effect.fn(
     "ReviewService.getDiffPreview",
   )(function* (input) {
-    yield* assertWorkspaceBoundCwd("ReviewService.getDiffPreview", input.cwd);
+    yield* assertWorkspaceBoundCwd("ReviewService.getDiffPreview", input.cwd, input.projectId);
 
     const handle = yield* vcsRegistry.detect({ cwd: input.cwd, requestedKind: "auto" });
     if (!handle) {
@@ -137,7 +164,7 @@ export const make = Effect.gen(function* () {
   const getDiffFileContents: ReviewService["Service"]["getDiffFileContents"] = Effect.fn(
     "ReviewService.getDiffFileContents",
   )(function* (input) {
-    yield* assertWorkspaceBoundCwd("ReviewService.getDiffFileContents", input.cwd);
+    yield* assertWorkspaceBoundCwd("ReviewService.getDiffFileContents", input.cwd, input.projectId);
 
     const handle = yield* vcsRegistry.detect({ cwd: input.cwd, requestedKind: "auto" });
     if (handle?.kind !== "git") {
