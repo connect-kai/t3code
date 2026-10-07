@@ -1,5 +1,7 @@
+import { useState } from "react";
 import {
   duoFoldState,
+  duoHoldOrientation,
   type DuoCommand,
   type DuoControlState,
 } from "@t3tools/client-runtime/device/duo-control";
@@ -31,7 +33,14 @@ export function DeviceDuoControls(props: {
   onCommand: (command: DuoCommand) => void;
 }) {
   const { screen } = props;
-  const { fold, stand, phoneVertical } = duoFoldState(screen);
+  const { fold, stand, phoneVertical: reportedVertical, settled } = duoFoldState(screen);
+  // A fold never changes how the phone is held. Keep the last settled reading
+  // through display handoffs, whose interim orientation belongs to the other display.
+  const [settledVertical, setSettledVertical] = useState(reportedVertical);
+  if (settled && settledVertical !== reportedVertical) setSettledVertical(reportedVertical);
+  // Stands rotate the device. Folding out of one returns it to how it was held before.
+  const [standVertical, setStandVertical] = useState(settledVertical);
+  const phoneVertical = stand ? standVertical : settledVertical;
   const foldLabels = {
     closed: "Closed",
     half: phoneVertical ? "Book" : "Laptop",
@@ -73,7 +82,14 @@ export function DeviceDuoControls(props: {
             id,
             foldLabels[id],
             !stand && fold === id,
-            () => props.onCommand({ control: "angle", value }),
+            () => {
+              if (stand)
+                props.onCommand({
+                  control: "orientation",
+                  value: duoHoldOrientation(standVertical, screen.screenId),
+                });
+              props.onCommand({ control: "angle", value });
+            },
             <DeviceDuoGlyph pose={id === "half" ? "book" : id} rotated={!phoneVertical} />,
           ),
         )}
@@ -84,7 +100,10 @@ export function DeviceDuoControls(props: {
             id,
             label,
             screen.hingePose === id,
-            () => props.onCommand({ control: "pose", value: id }),
+            () => {
+              if (!stand) setStandVertical(settledVertical);
+              props.onCommand({ control: "pose", value: id });
+            },
             <DeviceDuoGlyph pose={id} />,
           ),
         )}
